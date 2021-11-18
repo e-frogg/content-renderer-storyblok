@@ -1,0 +1,31 @@
+{
+  "name":         "efrogg/content-renderer-storyblok",
+  "description":  "storyblok node provider for efrogg/content-renderer",
+  "homepage":     "https://www.e-frogg.com",
+  "keywords":     ["CMS"],
+  "license":      "MIT",
+  "version":      "0.1",
+  "authors": [
+    {"name": "Raphaël HOMANN"}
+  ],
+  "require": {
+    "php": ">=7.2",
+    "ext-json": "*",
+    "storyblok/richtext-resolver": "^1.0",
+    "efrogg/content-renderer": "^2.0",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest"
+  },
+  "autoload": {
+    "psr-4": {
+      "Efrogg\\ContentRenderer\\Connector\\": "src/Connector"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Test\\": "tests/Test"
+    }
+  }
+}
