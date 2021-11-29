@@ -23,9 +23,12 @@ class StoryBlokAsset extends Asset
     public function __construct(?array $data = null)
     {
         parent::__construct($data);
-        $this->setSrc($this->computeSrc());
+        $this->updateSrc();
     }
 
+    public function updateSrc() {
+        $this->setSrc($this->computeSrc());
+    }
     private function computeSrc(): string
     {
         // filename : https://a.storyblok.com/f/106743/430x322/3b44845347/leadimage.png;

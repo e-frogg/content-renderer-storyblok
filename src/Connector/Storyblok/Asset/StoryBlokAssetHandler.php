@@ -27,7 +27,7 @@ class StoryBlokAssetHandler implements AssetHandlerInterface, SolverInterface
     public function getAsset($asset, $parameters = []): Asset
     {
         $asset->setParameters($parameters);
-        $asset->setSrc($asset->filename);
+        $asset->updateSrc();
         return $asset;
     }
 }
