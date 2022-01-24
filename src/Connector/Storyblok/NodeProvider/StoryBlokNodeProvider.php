@@ -5,6 +5,7 @@ namespace Efrogg\ContentRenderer\Connector\Storyblok\NodeProvider;
 
 
 use Efrogg\ContentRenderer\Connector\Storyblok\Asset\StoryBlokAsset;
+use Efrogg\ContentRenderer\Connector\Storyblok\Exception\InvalidConfigurationException;
 use Efrogg\ContentRenderer\Connector\Storyblok\Lib\ApiException;
 use Efrogg\ContentRenderer\Connector\Storyblok\Lib\Client;
 use Efrogg\ContentRenderer\Converter\Keyword;
@@ -15,7 +16,7 @@ use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
 use Psr\Log\LoggerInterface;
 use Storyblok\RichtextRender\Resolver;
 
-class StoryBlokNodeProvider implements NodeProviderInterface
+class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProviderInterface
 {
     use DecoratorAwareTrait;
     use LoggerProxy;
@@ -27,6 +28,9 @@ class StoryBlokNodeProvider implements NodeProviderInterface
     public const KEY_IMAGE_ID = 'id';
     public const PROVIDER_IDENTIFIER = 'StoryBlok';
 
+    public const MODE_PUBLIC = 'public';
+    public const MODE_PREVIEW = 'preview';
+
     private const DECORATED_WHITELIST_PLUGINS = [
         'wysiwyg-tinymce',
     ];
@@ -36,29 +40,42 @@ class StoryBlokNodeProvider implements NodeProviderInterface
     ];
 
     /**
-     * @var Client
+     * @var Client[]
      */
-    private $client;
+    private $clients;
+
+    /**
+     * @var string
+     */
+    private $clientMode = self::MODE_PUBLIC;
+
+    /**
+     * @var array<string,string>
+     */
+    private $apiKeys;
+
     /**
      * @var Resolver
      */
     private $textResolver;
+
     // acc0d372-11c5-426f-9786-6947004b745c
     private $uuidPattern = '/([\w]{8})-([\w]{4})-([\w]{4})-([\w]{4})-([\w]{12})/';
 
     public function __construct(array $apiKeys, ?LoggerInterface $logger = null)
     {
-        // TODO : production key
-        $this->client = new Client($apiKeys['preview']);
-        $this->client->setTimeout(5);
+        $this->apiKeys = $apiKeys;
         // pour le rendu  des RichText
         $this->textResolver = new Resolver();
         $this->initLogger($logger);
     }
 
+    /**
+     * @throws InvalidConfigurationException
+     */
     public function getNodeById(string $nodeId): Node
     {
-        return $this->convertStoryDataToNode($this->client->responseBody['story']);
+        return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
     }
 
     public function canResolve($solvable, string $resolverName): bool
@@ -69,15 +86,15 @@ class StoryBlokNodeProvider implements NodeProviderInterface
                 ['title' => 'StoryBlokNodeProvider']
             );
             if ($this->isUUID($solvable)) {
-                $this->client->getStoryByUuid($solvable);
+                $this->getClient()->getStoryByUuid($solvable);
             } else {
-                $this->client->getStoryBySlug($solvable);
+                $this->getClient()->getStoryBySlug($solvable);
             }
 
             return true;
         } catch (ApiException $e) {
 //            dump($e);
-            $this->error('error : ' . $e->getMessage(),['code'=>$e->getCode()]);
+            $this->error('error : ' . $e->getMessage(), ['code' => $e->getCode()]);
             return false;
         }
     }
@@ -93,9 +110,10 @@ class StoryBlokNodeProvider implements NodeProviderInterface
     {
         $context = [];
         $nodeData = [
-            '__cmsProvider__' => self::PROVIDER_IDENTIFIER,
+            '__cmsProvider__'        => self::PROVIDER_IDENTIFIER,
             '__storyBlokHotReload__' => isset($_GET['_storyblok_version']),
         ];
+//        dd($content);
         foreach ($content as $key => $value) {
             switch ($key) {
                 case self::KEY_EDITABLE:
@@ -127,7 +145,9 @@ class StoryBlokNodeProvider implements NodeProviderInterface
 
     /**
      * retourne true si on a affaire à une liste de nodes imbriqués
+     *
      * @param $nested
+     *
      * @return bool
      */
     private function isNestedNodeArray($nested): bool
@@ -152,6 +172,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface
 
     /**
      * @param mixed $value
+     *
      * @return mixed
      */
     private function convertValue($value)
@@ -204,6 +225,42 @@ class StoryBlokNodeProvider implements NodeProviderInterface
     private function isUUID($nodeId): bool
     {
         return preg_match($this->uuidPattern, $nodeId);
+    }
+
+    /**
+     * @return Client
+     * @throws InvalidConfigurationException
+     */
+    public function getClient(string $mode = null): Client
+    {
+        $mode ??= $this->getClientMode();
+
+        if (!isset($this->clients[$mode])) {
+            if (!isset($this->apiKeys[$mode])) {
+                throw new InvalidConfigurationException('no api keys for mode '.$mode);
+            }
+            $client = new Client($this->apiKeys['preview']);
+            $client->setTimeout(5);
+            $this->clients[$mode] = $client;
+        }
+        return $this->clients[$mode];
+    }
+
+    /**
+     * @return string
+     */
+    public function getClientMode(): string
+    {
+        return $this->clientMode;
+    }
+
+    /**
+     * @param string $clientMode
+     */
+    public function setClientMode(string $clientMode): void
+    {
+        $this->logger->info(sprintf('set mode "%s"',$clientMode));
+        $this->clientMode = $clientMode;
     }
 
 }
