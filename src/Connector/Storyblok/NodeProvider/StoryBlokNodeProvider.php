@@ -10,8 +10,8 @@ use Efrogg\ContentRenderer\Connector\Storyblok\Lib\ApiException;
 use Efrogg\ContentRenderer\Connector\Storyblok\Lib\Client;
 use Efrogg\ContentRenderer\Converter\Keyword;
 use Efrogg\ContentRenderer\Decorator\DecoratorAwareTrait;
-use Efrogg\ContentRenderer\Log\LoggerProxy;
 use Efrogg\ContentRenderer\Node;
+use Efrogg\ContentRenderer\NodeProvider\CacheableNodeProviderTrait;
 use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
 use Psr\Log\LoggerInterface;
 use Storyblok\RichtextRender\Resolver;
@@ -19,7 +19,7 @@ use Storyblok\RichtextRender\Resolver;
 class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProviderInterface
 {
     use DecoratorAwareTrait;
-    use LoggerProxy;
+    use CacheableNodeProviderTrait;
 
     public const KEY_EDITABLE = '_editable';
     public const KEY_UID = '_uid';
@@ -72,31 +72,26 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
 
     /**
      * @throws InvalidConfigurationException
+     * @throws ApiException
      */
-    public function getNodeById(string $nodeId): Node
+    public function fetchNodeById(string $nodeId): Node
     {
+        $this->info(
+            'load ' . $nodeId,
+            ['title' => 'StoryBlokNodeProvider']
+        );
+        if ($this->isUUID($nodeId)) {
+            $this->getClient()->getStoryByUuid($nodeId);
+        } else {
+            $this->getClient()->getStoryBySlug($nodeId);
+        }
+
         return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
     }
 
     public function canResolve($solvable, string $resolverName): bool
     {
-        try {
-            $this->info(
-                'load ' . $solvable,
-                ['title' => 'StoryBlokNodeProvider']
-            );
-            if ($this->isUUID($solvable)) {
-                $this->getClient()->getStoryByUuid($solvable);
-            } else {
-                $this->getClient()->getStoryBySlug($solvable);
-            }
-
-            return true;
-        } catch (ApiException $e) {
-//            dump($e);
-            $this->error('error : ' . $e->getMessage(), ['code' => $e->getCode()]);
-            return false;
-        }
+       return true;
     }
 
     private function convertStoryDataToNode(array $storyData): Node
@@ -261,6 +256,11 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     {
         $this->logger->info(sprintf('set mode "%s"',$clientMode));
         $this->clientMode = $clientMode;
+    }
+
+    public function getCacheKeyPrefix(): string
+    {
+        return '';
     }
 
 }
