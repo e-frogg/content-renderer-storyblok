@@ -6,14 +6,17 @@ namespace Efrogg\ContentRenderer\Connector\Storyblok\Asset;
 
 use Efrogg\ContentRenderer\Asset\Asset;
 use Efrogg\ContentRenderer\Asset\AssetHandlerInterface;
+use Efrogg\ContentRenderer\Cache\ControlableCacheInterface;
+use Efrogg\ContentRenderer\Cache\ControlableCacheTrait;
 use Efrogg\ContentRenderer\Core\Resolver\SolverInterface;
 use Efrogg\ContentRenderer\Log\LoggerProxy;
 use RuntimeException;
 
-class AssetDownloader implements AssetHandlerInterface, SolverInterface
+class AssetDownloader implements AssetHandlerInterface, SolverInterface, ControlableCacheInterface
 {
     use AssetHandlerAwareTrait;
     use LoggerProxy;
+    use ControlableCacheTrait;
 
     public const STORAGE_HASH = 'hash';
     public const STORAGE_RAW = 'raw';
@@ -65,6 +68,11 @@ class AssetDownloader implements AssetHandlerInterface, SolverInterface
     {
         $asset = $this->getAssetHandler()->getAsset($asset, $parameters);
 
+        # no download for preview mode
+        if ($asset->isPreview() || !$this->isUseCache()) {
+            return $asset;
+        }
+
         try {
             $newSrc = $this->downloadAsset($asset);
             $asset->setSrc($newSrc);
@@ -114,6 +122,11 @@ class AssetDownloader implements AssetHandlerInterface, SolverInterface
 
     private function isFresh(string $targetFilename): bool
     {
+        if($this->isUpdateCache()) {
+            $this->info('refresh asset '.$targetFilename.' is fresh',['title'=>'AssetDownloader']);
+            return false;
+        }
+
         if (!file_exists($targetFilename)) {
             $this->warning('asset '.$targetFilename.' does not exist');
             return false;
@@ -121,7 +134,7 @@ class AssetDownloader implements AssetHandlerInterface, SolverInterface
 
         $age = time() - filemtime($targetFilename);
         if($age>$this->maxAge) {
-            $this->warning('asset '.$targetFilename.' is TOO old ('.$age.')');
+            $this->warning(sprintf('asset %s is TOO old (%d > %d)',$targetFilename,$age,$this->maxAge));
             return false;
         }
 
