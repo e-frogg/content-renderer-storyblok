@@ -6,10 +6,10 @@ namespace Efrogg\ContentRenderer\Connector\Storyblok\NodeProvider;
 
 use Efrogg\ContentRenderer\Connector\Storyblok\Asset\StoryBlokAsset;
 use Efrogg\ContentRenderer\Connector\Storyblok\Exception\InvalidConfigurationException;
-use Efrogg\ContentRenderer\Connector\Storyblok\Lib\ApiException;
 use Efrogg\ContentRenderer\Connector\Storyblok\Lib\Client;
 use Efrogg\ContentRenderer\Converter\Keyword;
 use Efrogg\ContentRenderer\Decorator\DecoratorAwareTrait;
+use Efrogg\ContentRenderer\Exception\NodeNotFoundException;
 use Efrogg\ContentRenderer\Node;
 use Efrogg\ContentRenderer\NodeProvider\CacheableNodeProviderTrait;
 use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
@@ -30,6 +30,8 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
 
     public const MODE_PUBLIC = 'public';
     public const MODE_PREVIEW = 'preview';
+
+    private int $maxRetries = 3;
 
     private const DECORATED_WHITELIST_PLUGINS = [
         'wysiwyg-tinymce',
@@ -72,7 +74,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
 
     /**
      * @throws InvalidConfigurationException
-     * @throws ApiException
+     * @throws NodeNotFoundException
      */
     public function fetchNodeById(string $nodeId): Node
     {
@@ -80,10 +82,14 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
             'load ' . $nodeId,
             ['title' => 'StoryBlokNodeProvider']
         );
-        if ($this->isUUID($nodeId)) {
-            $this->getClient()->getStoryByUuid($nodeId);
-        } else {
-            $this->getClient()->getStoryBySlug($nodeId);
+        try {
+            if ($this->isUUID($nodeId)) {
+                $this->getClient()->getStoryByUuid($nodeId);
+            } else {
+                $this->getClient()->getStoryBySlug($nodeId);
+            }
+        } catch (\Exception) {
+            throw new NodeNotFoundException(sprintf('node %s was not found on storyblok', $nodeId));
         }
 
         return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
@@ -235,6 +241,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
                 throw new InvalidConfigurationException('no api keys for mode '.$mode);
             }
             $client = new Client($this->apiKeys['preview']);
+            $client->setMaxRetries($this->maxRetries);
             $client->setTimeout(5);
             $this->clients[$mode] = $client;
         }
@@ -261,6 +268,14 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     public function getCacheKeyPrefix(): string
     {
         return '';
+    }
+
+    /**
+     * @param int $maxRetries
+     */
+    public function setMaxRetries(int $maxRetries): void
+    {
+        $this->maxRetries = $maxRetries;
     }
 
 }

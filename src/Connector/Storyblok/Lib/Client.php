@@ -49,6 +49,8 @@ class Client extends BaseClient
      */
     protected $cache;
 
+    protected $maxRetries = 2;
+
     /**
      * @param string $apiKey
      * @param string $apiEndpoint

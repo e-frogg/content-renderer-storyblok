@@ -5,6 +5,7 @@ namespace Efrogg\ContentRenderer\Connector\Storyblok\Lib;
 use Closure;
 use GuzzleHttp\Client as Guzzle;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\HandlerStack;
@@ -88,7 +89,7 @@ class BaseClient
             $retries,
             $request,
             $response = null,
-            RequestException $exception = null
+            GuzzleException $exception = null
         ) {
             // Limit the number of retries
             if ($retries >= $this->maxRetries) {
@@ -100,7 +101,7 @@ class BaseClient
                 return true;
             }
 
-            if ($response) {
+            if (($exception instanceof RequestException) && $response) {
                 // Retry on server errors
                 if ($response->getStatusCode() >= 500 || $response->getStatusCode() === 429) {
                     return true;
@@ -119,7 +120,8 @@ class BaseClient
     public function retryDelay()
     {
         return function ($numberOfRetries) {
-            return 1000 * $numberOfRetries;
+            return 1000;
+//            return 200 * $numberOfRetries;
         };
     }
 
