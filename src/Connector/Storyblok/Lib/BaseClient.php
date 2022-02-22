@@ -22,7 +22,7 @@ class BaseClient
     const EXCEPTION_GENERIC_HTTP_ERROR = "An HTTP Error has occurred!";
 
     /**
-     * @var stdClass
+     * @var stdClass|array
      */
     public $responseBody;
 
