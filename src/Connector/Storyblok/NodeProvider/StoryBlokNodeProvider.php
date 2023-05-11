@@ -23,6 +23,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
 
     public const KEY_EDITABLE = '_editable';
     public const KEY_UID = '_uid';
+    public const KEY_NODE_UID = 'uuid';
     public const KEY_FILENAME = 'filename';
     public const KEY_COMPONENT = 'component';
     public const KEY_IMAGE_ID = 'id';
@@ -92,7 +93,8 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
             throw new NodeNotFoundException(sprintf('node %s was not found on storyblok', $nodeId));
         }
 
-        return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
+        $node = $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
+        return $node;
     }
 
     public function canResolve($solvable, string $resolverName): bool
@@ -104,16 +106,19 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     {
         $this->info('convert data', ['data' => $storyData, 'title' => 'StoryBlokNodeProvider']);
 
-        return $this->convertDataToNode($storyData['content']);
+        return $this->convertDataToNode($storyData['content'],$storyData[self::KEY_NODE_UID]??null);
     }
 
-    private function convertDataToNode(array $content): Node
+    private function convertDataToNode(array $content,?string $forcedUuid=null): Node
     {
         $context = [];
         $nodeData = [
             '__cmsProvider__'        => self::PROVIDER_IDENTIFIER,
             '__storyBlokHotReload__' => isset($_GET['_storyblok_version']),
         ];
+        if(null !== $forcedUuid) {
+            $nodeData[Keyword::NODE_ID] = $forcedUuid;
+        }
 //        dd($content);
         foreach ($content as $key => $value) {
             switch ($key) {
@@ -122,7 +127,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
                     $nodeData[Keyword::PREVIEW] = true;
                     break;
                 case self::KEY_UID:
-                    $nodeData[Keyword::NODE_ID] = $value;
+                    $nodeData[Keyword::NODE_ID] ??= $value;
                     break;
                 case self::KEY_COMPONENT:
                     $nodeData[Keyword::NODE_TYPE] = $value;
