@@ -15,6 +15,7 @@ use Efrogg\ContentRenderer\NodeProvider\CacheableNodeProviderTrait;
 use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
 use Psr\Log\LoggerInterface;
 use Storyblok\RichtextRender\Resolver;
+use Swef\Editorial\Helpers\ShoppingGuideHelper;
 
 class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProviderInterface
 {
@@ -96,6 +97,40 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
         $node = $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
         return $node;
     }
+
+    /**
+     * @param array<string,mixed> $basePath
+     *
+     * @return array<string,Node>
+     *  stories indexed by full_slug
+     * @throws InvalidConfigurationException
+     * @see https://www.storyblok.com/docs/api/content-delivery/v2#core-resources/stories/retrieve-multiple-stories
+     */
+    public function fetchStoriesFromRepository(array $parameters, int $perPage=25): array
+    {
+        $parameters['per_page']=$perPage;
+        $page = 1;
+        $nodes=[];
+        while(true) {
+            $parameters['page']=$page;
+            $this->getClient()->getStories($parameters);
+
+            // fetch to storyblok
+            $stories = $this->getClient()->responseBody['stories']??[];
+            if(empty($stories)) {
+                break;
+            }
+            foreach ($stories as $story) {
+                $nodes[$story['full_slug']] = $this->convertStoryDataToNode($story);
+            }
+            if(count($stories)<$perPage) {
+                break;
+            }
+            $page++;
+        }
+        return $nodes;
+    }
+
 
     public function canResolve($solvable, string $resolverName): bool
     {
