@@ -15,7 +15,6 @@ use Efrogg\ContentRenderer\NodeProvider\CacheableNodeProviderTrait;
 use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
 use Psr\Log\LoggerInterface;
 use Storyblok\RichtextRender\Resolver;
-use Swef\Editorial\Helpers\ShoppingGuideHelper;
 
 class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProviderInterface
 {
@@ -66,6 +65,10 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     // acc0d372-11c5-426f-9786-6947004b745c
     private $uuidPattern = '/([\w]{8})-([\w]{4})-([\w]{4})-([\w]{4})-([\w]{12})/';
 
+    /**
+     * @param array<string,string> $apiKeys
+     * @param LoggerInterface|null $logger
+     */
     public function __construct(array $apiKeys, ?LoggerInterface $logger = null)
     {
         $this->apiKeys = $apiKeys;
@@ -94,12 +97,11 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
             throw new NodeNotFoundException(sprintf('node %s was not found on storyblok', $nodeId));
         }
 
-        $node = $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
-        return $node;
+        return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
     }
 
     /**
-     * @param array<string,mixed> $basePath
+     * @param array<string,mixed> $parameters
      *
      * @return array<string,Node>
      *  stories indexed by full_slug
@@ -137,6 +139,9 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
        return true;
     }
 
+    /**
+     * @param array<string,mixed> $storyData
+     */
     private function convertStoryDataToNode(array $storyData): Node
     {
         $this->info('convert data', ['data' => $storyData, 'title' => 'StoryBlokNodeProvider']);
@@ -144,6 +149,9 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
         return $this->convertDataToNode($storyData['content'],$storyData[self::KEY_NODE_UID]??null);
     }
 
+    /**
+     * @param array<mixed> $content
+     */
     private function convertDataToNode(array $content,?string $forcedUuid=null): Node
     {
         $context = [];
@@ -187,7 +195,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     /**
      * retourne true si on a affaire à une liste de nodes imbriqués
      *
-     * @param $nested
+     * @param mixed $nested
      *
      * @return bool
      */
@@ -206,6 +214,9 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
         return true;
     }
 
+    /**
+     * @param mixed $nested
+     */
     private function isAssetArray($nested): bool
     {
         return is_array($nested) && isset($nested[0][self::KEY_IMAGE_ID], $nested[0][self::KEY_FILENAME]);
@@ -216,7 +227,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
      *
      * @return mixed
      */
-    private function convertValue($value)
+    private function convertValue($value): mixed
     {
         if ($this->isNestedNodeArray($value)) {
             $newArray = [];
@@ -263,7 +274,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     }
 
     // acc0d372-11c5-426f-9786-6947004b745c
-    private function isUUID($nodeId): bool
+    private function isUUID(string $nodeId): bool
     {
         return preg_match($this->uuidPattern, $nodeId);
     }
