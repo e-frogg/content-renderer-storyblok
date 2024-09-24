@@ -5,6 +5,7 @@ namespace Efrogg\ContentRenderer\Connector\Storyblok\NodeProvider;
 
 
 use Efrogg\ContentRenderer\Connector\Storyblok\Asset\StoryBlokAsset;
+use Efrogg\ContentRenderer\Event\FilterNodeDataEvent;
 use Efrogg\ContentRenderer\Connector\Storyblok\Exception\InvalidConfigurationException;
 use Efrogg\ContentRenderer\Connector\Storyblok\Lib\Client;
 use Efrogg\ContentRenderer\Converter\Keyword;
@@ -15,6 +16,7 @@ use Efrogg\ContentRenderer\NodeProvider\CacheableNodeProviderTrait;
 use Efrogg\ContentRenderer\NodeProvider\NodeProviderInterface;
 use Psr\Log\LoggerInterface;
 use Storyblok\RichtextRender\Resolver;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProviderInterface
 {
@@ -64,17 +66,20 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
 
     // acc0d372-11c5-426f-9786-6947004b745c
     private $uuidPattern = '/([\w]{8})-([\w]{4})-([\w]{4})-([\w]{4})-([\w]{12})/';
+    private EventDispatcherInterface $eventDispatcher;
 
     /**
-     * @param array<string,string> $apiKeys
-     * @param LoggerInterface|null $logger
+     * @param array<string,string>     $apiKeys
+     * @param EventDispatcherInterface $eventDispatcher
+     * @param LoggerInterface|null     $logger
      */
-    public function __construct(array $apiKeys, ?LoggerInterface $logger = null)
+    public function __construct(array $apiKeys, EventDispatcherInterface $eventDispatcher, ?LoggerInterface $logger = null)
     {
         $this->apiKeys = $apiKeys;
         // pour le rendu  des RichText
         $this->textResolver = new Resolver();
         $this->initLogger($logger);
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     /**
@@ -97,7 +102,8 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
             throw new NodeNotFoundException(sprintf('node %s was not found on storyblok', $nodeId));
         }
 
-        return $this->convertStoryDataToNode($this->getClient()->responseBody['story']);
+        return $this->convertStoryDataToNode($this->getClient()->responseBody['story'])
+            ?? throw new NodeNotFoundException(sprintf('node %s was found but was not converted to node (FilterNodeDataEvent)', $nodeId));
     }
 
     /**
@@ -130,7 +136,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
             }
             $page++;
         }
-        return $nodes;
+        return array_filter($nodes);
     }
 
 
@@ -142,7 +148,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     /**
      * @param array<string,mixed> $storyData
      */
-    private function convertStoryDataToNode(array $storyData): Node
+    private function convertStoryDataToNode(array $storyData): ?Node
     {
         $this->info('convert data', ['data' => $storyData, 'title' => 'StoryBlokNodeProvider']);
 
@@ -152,7 +158,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     /**
      * @param array<mixed> $content
      */
-    private function convertDataToNode(array $content,?string $forcedUuid=null): Node
+    private function convertDataToNode(array $content,?string $forcedUuid=null): ?Node
     {
         $context = [];
         $nodeData = [
@@ -162,8 +168,14 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
         if(null !== $forcedUuid) {
             $nodeData[Keyword::NODE_ID] = $forcedUuid;
         }
-//        dd($content);
-        foreach ($content as $key => $value) {
+
+        $event = new FilterNodeDataEvent($content);
+        $this->eventDispatcher->dispatch($event);
+
+        if($event->isHidden()) {
+            return null;
+        }
+        foreach ($event->getContent() as $key => $value) {
             switch ($key) {
                 case self::KEY_EDITABLE:
                     $nodeData[Keyword::EDITABLE] = $this->extractEditable($content[self::KEY_UID], $value);
@@ -232,7 +244,10 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
         if ($this->isNestedNodeArray($value)) {
             $newArray = [];
             foreach ($value as $nodeKey => $nodeData) {
-                $newArray[$nodeKey] = $this->convertDataToNode($nodeData);
+                $node = $this->convertDataToNode($nodeData);
+                if(null !== $node) {
+                    $newArray[$nodeKey] = $node;
+                }
             }
 
             return $newArray;
