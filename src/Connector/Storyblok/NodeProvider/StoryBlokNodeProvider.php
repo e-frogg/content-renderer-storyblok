@@ -148,7 +148,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
     /**
      * @param array<string,mixed> $storyData
      */
-    private function convertStoryDataToNode(array $storyData): ?Node
+    public function convertStoryDataToNode(array $storyData): ?Node
     {
         $this->info('convert data', ['data' => $storyData, 'title' => 'StoryBlokNodeProvider']);
 
