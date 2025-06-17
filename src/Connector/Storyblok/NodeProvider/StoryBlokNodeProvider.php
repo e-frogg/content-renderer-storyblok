@@ -298,7 +298,7 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
      * @return Client
      * @throws InvalidConfigurationException
      */
-    public function getClient(string $mode = null): Client
+    public function getClient(?string $mode = null): Client
     {
         $mode ??= $this->getClientMode();
 
