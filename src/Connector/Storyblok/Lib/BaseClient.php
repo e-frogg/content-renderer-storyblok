@@ -89,7 +89,7 @@ class BaseClient
             $retries,
             $request,
             $response = null,
-            GuzzleException $exception = null
+            ?GuzzleException $exception = null
         ) {
             // Limit the number of retries
             if ($retries >= $this->maxRetries) {
