@@ -28,6 +28,25 @@ class StoryBlokAssetHandler implements AssetHandlerInterface, SolverInterface
     {
         $asset->setParameters($parameters);
         $asset->updateSrc();
+        $asset->dimensions = $this->computeDimensions($asset);
         return $asset;
+    }
+
+    /**
+     * @param Asset $asset
+     * @return array<string,mixed>
+     */
+    private function computeDimensions($asset): array
+    {
+        // https://a.storyblok.com/f/287370148876658/500x289/b17019ecec/filmage-e30c.png
+        //     "src" => "https://img2.storyblok.com/500x500/filters:focal()/f/287370148876658/1074x557/f18c3d7e16/salon-de-la-photo.png"
+        if (preg_match('/\/(\d+)x(\d+)\//i', $asset->src, $matches)) {
+            return [
+                'width' => (int)$matches[1],
+                'height' => (int)$matches[2],
+                'aspectRatio' => "$matches[1]/$matches[2]",
+            ];
+        }
+        return [];
     }
 }

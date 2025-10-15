@@ -65,7 +65,7 @@ class StoryBlokAsset extends Asset
                     }
                 }
                 $additionalPathParameters[]= ($p['width']??'0').'x'.($p['height']??'0');
-                if(isset($this->focus)) {
+                if(isset($this->focus)&& !empty($this->focus)) {
                     $additionalPathParameters[]='filters:focal('.$this->focus.')';
                 }
                 // https://img2.storyblok.com/600x130/filters:focal(450x0:550x100)/f/39898/1000x600/d962430746/demo-image-human.jpeg
