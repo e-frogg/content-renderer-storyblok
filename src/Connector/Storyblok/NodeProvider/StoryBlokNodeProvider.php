@@ -88,6 +88,10 @@ class StoryBlokNodeProvider implements NodeProviderInterface, StoryBlokNodeProvi
      */
     public function fetchNodeById(string $nodeId): Node
     {
+        $nodeId = trim($nodeId);
+        if($nodeId === '') {
+            throw new NodeNotFoundException('node id is empty');
+        }
         $this->info(
             'load ' . $nodeId,
             ['title' => 'StoryBlokNodeProvider']
